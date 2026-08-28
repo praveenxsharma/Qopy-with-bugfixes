@@ -57,7 +57,7 @@ fn main() {
         ))
         .plugin(
             tauri_plugin_prevent_default::Builder::new()
-                .with_flags(Flags::all().difference(Flags::CONTEXT_MENU))
+                .with_flags(Flags::all())
                 .build(),
         )
         .setup(|app| {
