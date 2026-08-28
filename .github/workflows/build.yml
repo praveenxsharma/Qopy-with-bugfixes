@@ -43,6 +43,9 @@ jobs:
             sed -e "s/${{ secrets.APPLE_ID }}/REDACTED/g;s/${{ secrets.APPLE_ID_PASSWORD }}/REDACTED/g;s/${{ secrets.APPLE_CERTIFICATE }}/REDACTED/g;s/${{ secrets.APPLE_CERTIFICATE_PASSWORD }}/REDACTED/g;s/${{ secrets.KEYCHAIN_PASSWORD }}/REDACTED/g;s/${{ secrets.PAT }}/REDACTED/g;s/${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}/REDACTED/g"
           }
           exec > >(redact_output) 2>&1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -55,13 +58,7 @@ jobs:
           cache-directories: "~/.cargo/registry/index/,~/.cargo/registry/cache/,~/.cargo/git/db/"
           shared-key: "macos-rust-cache"
           save-if: "true"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - run: npm install -g pnpm && pnpm install
+      - run: bun install
       - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -138,6 +135,9 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -150,13 +150,7 @@ jobs:
           cache-directories: "~/.cargo/registry/index/,~/.cargo/registry/cache/,~/.cargo/git/db/"
           shared-key: "windows-rust-cache"
           save-if: "true"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - run: npm install -g pnpm && pnpm install
+      - run: bun install
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -194,6 +188,9 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -206,18 +203,12 @@ jobs:
           cache-directories: "~/.cargo/registry/index/,~/.cargo/registry/cache/,~/.cargo/git/db/"
           shared-key: "ubuntu-rust-cache"
           save-if: "true"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev rpm
           echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-      - run: npm install -g pnpm && pnpm install
+      - run: bun install
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
