@@ -5,8 +5,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "pnpm nuxt dev",
-    "beforeBuildCommand": "pnpm nuxt generate"
+    "beforeDevCommand": "bunx nuxt dev",
+    "beforeBuildCommand": "bun run generate"
   },
   "app": {
     "windows": [
