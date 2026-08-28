@@ -24,3 +24,10 @@ logs
 !.env.example
 .gitignore
 .vscode
+# AI Agent files
+agents.md
+goal.md
+
+# Test Builds
+test/
+

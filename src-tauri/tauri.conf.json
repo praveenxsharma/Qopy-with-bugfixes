@@ -50,7 +50,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDExNDIzNjA1QjE0NjU1OTkKUldTWlZVYXhCVFpDRWNvNmt0UE5lQmZkblEyZGZiZ2tHelJvT2YvNVpLU1RIM1RKZFQrb2tzWWwK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEzMUNDNDU0MzEyMTcxRUYKUldUdmNTRXhWTVFjbzZBWEM1cWZmVDhGMFlVd01ndUNvWlVkOURwN2crbGUyYXVycXl0L3AvRHYK",
       "endpoints": ["https://qopy.pandadev.net/"]
     }
   },
