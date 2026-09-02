@@ -24,6 +24,12 @@ fn main() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_clipboard::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -119,6 +125,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             api::clipboard::write_and_paste,
+            api::clipboard::copy_to_clipboard,
             db::history::get_history,
             db::history::add_history_item,
             db::history::search_history,
@@ -126,9 +133,13 @@ fn main() {
             db::history::delete_history_item,
             db::history::clear_history,
             db::history::read_image,
+            db::history::toggle_pin_history_item,
+            db::history::set_history_item_title,
             db::settings::get_setting,
             db::settings::save_setting,
-            utils::commands::fetch_page_meta
+            utils::commands::fetch_page_meta,
+            utils::commands::open_in_browser,
+            utils::commands::open_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
