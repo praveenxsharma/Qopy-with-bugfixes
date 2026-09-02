@@ -46,11 +46,9 @@ pub fn setup(app_handle: tauri::AppHandle) {
 
     let state_clone = Arc::clone(&state);
     app_handle.listen("update-shortcut", move |event| {
-        let payload_str = event.payload().replace("\\\"", "\"");
-        let trimmed_str = payload_str.trim_matches('"');
+        let payload = parse_shortcut_payload(event.payload());
         unregister_current_hotkey(&state_clone);
-        
-        let payload: Vec<String> = serde_json::from_str(trimmed_str).unwrap_or_default();
+
         if let Err(e) = register_shortcut(&state_clone, &payload) {
             eprintln!("Error re-registering shortcut: {:?}", e);
         }
@@ -58,10 +56,9 @@ pub fn setup(app_handle: tauri::AppHandle) {
 
     let state_clone = Arc::clone(&state);
     app_handle.listen("save_keybind", move |event| {
-        let payload_str = event.payload().to_string();
+        let payload = parse_shortcut_payload(event.payload());
         unregister_current_hotkey(&state_clone);
-        
-        let payload: Vec<String> = serde_json::from_str(&payload_str).unwrap_or_default();
+
         if let Err(e) = register_shortcut(&state_clone, &payload) {
             eprintln!("Error registering saved shortcut: {:?}", e);
         }
@@ -84,6 +81,21 @@ fn setup_hotkey_receiver(app_handle: AppHandle) {
             }
         }
     });
+}
+
+fn parse_shortcut_payload(raw: &str) -> Vec<String> {
+    let unescaped = raw.replace("\\\"", "\"");
+    let trimmed = unescaped.trim_matches('"');
+
+    if let Ok(payload) = serde_json::from_str::<Vec<String>>(trimmed) {
+        return payload;
+    }
+
+    if let Ok(payload) = serde_json::from_str::<Vec<String>>(&unescaped) {
+        return payload;
+    }
+
+    serde_json::from_str(raw).unwrap_or_default()
 }
 
 fn unregister_current_hotkey(state: &Arc<Mutex<HotkeyState>>) {
