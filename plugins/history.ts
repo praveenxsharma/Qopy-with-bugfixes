@@ -52,6 +52,21 @@ export default defineNuxtPlugin(() => {
           await invoke<void>("write_and_paste", data);
         },
 
+        async copyToClipboard(data: {
+          content: string;
+          contentType: string;
+        }): Promise<void> {
+          await invoke<void>("copy_to_clipboard", data);
+        },
+
+        async togglePin(id: string): Promise<boolean> {
+          return await invoke<boolean>("toggle_pin_history_item", { id });
+        },
+
+        async setTitle(id: string, title: string | null): Promise<void> {
+          await invoke<void>("set_history_item_title", { id, title });
+        },
+
         async readImage(data: { filename: string }): Promise<string> {
           return await invoke<string>("read_image", data);
         },

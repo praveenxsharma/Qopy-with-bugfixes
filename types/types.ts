@@ -18,6 +18,8 @@ export class HistoryItem {
   favicon?: string;
   timestamp: Date;
   language?: string;
+  pinned: boolean;
+  title?: string;
 
   constructor(
     source: string,
@@ -35,6 +37,7 @@ export class HistoryItem {
     this.favicon = favicon;
     this.timestamp = new Date();
     this.language = language;
+    this.pinned = false;
   }
 
   toRow(): [
