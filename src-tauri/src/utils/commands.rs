@@ -135,3 +135,13 @@ pub async fn fetch_page_meta(url: String) -> Result<(String, Option<String>), St
 
     Ok((metadata.title.unwrap_or_else(|| "No title found".to_string()), metadata.image))
 }
+
+#[tauri::command]
+pub fn open_in_browser(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn open_path(path: String) -> Result<(), String> {
+    open::that(&path).map_err(|e| e.to_string())
+}

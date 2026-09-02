@@ -93,6 +93,42 @@ pub async fn write_and_paste(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn copy_to_clipboard(
+    app_handle: AppHandle,
+    content: String,
+    content_type: String
+) -> Result<(), String> {
+    let clipboard = app_handle.state::<Clipboard>();
+
+    match content_type.as_str() {
+        "text" | "link" | "color" => clipboard.write_text(content).map_err(|e| e.to_string())?,
+        "image" => {
+            clipboard.write_image_base64(content).map_err(|e| e.to_string())?;
+        }
+        "files" => {
+            clipboard
+                .write_files_uris(
+                    content
+                        .split(", ")
+                        .map(|file| file.to_string())
+                        .collect::<Vec<String>>()
+                )
+                .map_err(|e| e.to_string())?;
+        }
+        _ => {
+            return Err("Unsupported content type".to_string());
+        }
+    }
+
+    let _ = app_handle.track_event(
+        "clipboard_copy",
+        Some(serde_json::json!({ "content_type": content_type })),
+    );
+
+    Ok(())
+}
+
 pub fn setup(app: &AppHandle) {
     let app_handle = app.clone();
     let runtime = TokioRuntime::new().expect("Failed to create Tokio runtime");
