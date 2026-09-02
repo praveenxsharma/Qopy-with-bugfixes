@@ -13,6 +13,8 @@ pub struct HistoryItem {
     pub favicon: Option<String>,
     pub timestamp: DateTime<Utc>,
     pub language: Option<String>,
+    pub pinned: bool,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -126,6 +128,8 @@ impl HistoryItem {
             favicon,
             timestamp: Utc::now(),
             language,
+            pinned: false,
+            title: None,
         }
     }
 

@@ -25,28 +25,31 @@ pub async fn initialize_history(pool: &SqlitePool) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+fn map_row(row: &sqlx::sqlite::SqliteRow) -> HistoryItem {
+    HistoryItem {
+        id: row.get("id"),
+        source: row.get("source"),
+        source_icon: row.get("source_icon"),
+        content_type: ContentType::from(row.get::<String, _>("content_type")),
+        content: row.get("content"),
+        favicon: row.get("favicon"),
+        timestamp: row.get("timestamp"),
+        language: row.get("language"),
+        pinned: row.get::<i64, _>("pinned") != 0,
+        title: row.get("title"),
+    }
+}
+
 #[tauri::command]
 pub async fn get_history(pool: tauri::State<'_, SqlitePool>) -> Result<Vec<HistoryItem>, String> {
     let rows = sqlx
         ::query(
-            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language FROM history ORDER BY timestamp DESC"
+            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language, pinned, title FROM history ORDER BY pinned DESC, timestamp DESC"
         )
         .fetch_all(&*pool).await
         .map_err(|e| e.to_string())?;
 
-    let items = rows
-        .iter()
-        .map(|row| HistoryItem {
-            id: row.get("id"),
-            source: row.get("source"),
-            source_icon: row.get("source_icon"),
-            content_type: ContentType::from(row.get::<String, _>("content_type")),
-            content: row.get("content"),
-            favicon: row.get("favicon"),
-            timestamp: row.get("timestamp"),
-            language: row.get("language"),
-        })
-        .collect();
+    let items = rows.iter().map(map_row).collect();
 
     Ok(items)
 }
@@ -119,29 +122,17 @@ pub async fn search_history(
     
     let rows = sqlx
         ::query(
-            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language 
+            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language, pinned, title 
              FROM history 
              WHERE content LIKE ? 
-             ORDER BY timestamp DESC
+             ORDER BY pinned DESC, timestamp DESC
              LIMIT 100"
         )
         .bind(query)
         .fetch_all(&*pool).await
         .map_err(|e| e.to_string())?;
 
-    let mut items = Vec::with_capacity(rows.len());
-    for row in rows.iter() {
-        items.push(HistoryItem {
-            id: row.get("id"),
-            source: row.get("source"),
-            source_icon: row.get("source_icon"),
-            content_type: ContentType::from(row.get::<String, _>("content_type")),
-            content: row.get("content"),
-            favicon: row.get("favicon"),
-            timestamp: row.get("timestamp"),
-            language: row.get("language"),
-        });
-    }
+    let items = rows.iter().map(map_row).collect();
 
     Ok(items)
 }
@@ -154,26 +145,14 @@ pub async fn load_history_chunk(
 ) -> Result<Vec<HistoryItem>, String> {
     let rows = sqlx
         ::query(
-            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language FROM history ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language, pinned, title FROM history ORDER BY pinned DESC, timestamp DESC LIMIT ? OFFSET ?"
         )
         .bind(limit)
         .bind(offset)
         .fetch_all(&*pool).await
         .map_err(|e| e.to_string())?;
 
-    let items = rows
-        .iter()
-        .map(|row| HistoryItem {
-            id: row.get("id"),
-            source: row.get("source"),
-            source_icon: row.get("source_icon"),
-            content_type: ContentType::from(row.get::<String, _>("content_type")),
-            content: row.get("content"),
-            favicon: row.get("favicon"),
-            timestamp: row.get("timestamp"),
-            language: row.get("language"),
-        })
-        .collect();
+    let items = rows.iter().map(map_row).collect();
 
     Ok(items)
 }
@@ -214,4 +193,48 @@ pub async fn clear_history(
 pub async fn read_image(filename: String) -> Result<String, String> {
     let bytes = fs::read(filename).map_err(|e| e.to_string())?;
     Ok(STANDARD.encode(bytes))
+}
+
+#[tauri::command]
+pub async fn toggle_pin_history_item(
+    app_handle: tauri::AppHandle,
+    pool: tauri::State<'_, SqlitePool>,
+    id: String
+) -> Result<bool, String> {
+    let current: i64 = sqlx
+        ::query_scalar("SELECT pinned FROM history WHERE id = ?")
+        .bind(&id)
+        .fetch_one(&*pool).await
+        .map_err(|e| e.to_string())?;
+
+    let new_val = if current != 0 { 0 } else { 1 };
+    sqlx
+        ::query("UPDATE history SET pinned = ? WHERE id = ?")
+        .bind(new_val)
+        .bind(&id)
+        .execute(&*pool).await
+        .map_err(|e| e.to_string())?;
+
+    let _ = app_handle.track_event(
+        "history_pin_toggled",
+        Some(serde_json::json!({ "pinned": new_val })),
+    );
+
+    Ok(new_val != 0)
+}
+
+#[tauri::command]
+pub async fn set_history_item_title(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+    title: Option<String>
+) -> Result<(), String> {
+    sqlx
+        ::query("UPDATE history SET title = ? WHERE id = ?")
+        .bind(title)
+        .bind(id)
+        .execute(&*pool).await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
