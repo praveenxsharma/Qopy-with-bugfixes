@@ -102,4 +102,17 @@ body {
 .os-scrollbar-horizontal {
   display: none;
 }
+
+html,
+body {
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
 </style>
