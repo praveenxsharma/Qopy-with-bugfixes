@@ -52,15 +52,28 @@
     <span v-if="item.content_type === ContentType.Image">
       Image ({{ dimensions || "Loading..." }})
     </span>
-    <span v-else>{{ truncateContent(item.content) }}</span>
+    <span v-else>{{ title }}</span>
+    <svg
+      v-if="item.pinned"
+      class="pin"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M12 2L14.4 8.2L21 9.3L16.5 13.7L17.6 20.3L12 17L6.4 20.3L7.5 13.7L3 9.3L9.6 8.2L12 2Z"
+        fill="currentColor" />
+    </svg>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { ContentType } from "~/types/types";
 import type { HistoryItem } from "~/types/types";
 
-defineProps<{
+const props = defineProps<{
   item: HistoryItem;
   selected: boolean;
   imageUrl?: string;
@@ -89,6 +102,10 @@ const truncateContent = (content: string): string => {
     ? content.slice(0, maxChars - 3) + "..."
     : content;
 };
+
+const title = computed(() =>
+  props.item.title ? props.item.title : truncateContent(props.item.content)
+);
 </script>
 
 <style scoped lang="scss">
@@ -117,6 +134,11 @@ const truncateContent = (content: string): string => {
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text);
+  }
+
+  .pin {
+    color: var(--accent);
+    flex-shrink: 0;
   }
 }
 </style>

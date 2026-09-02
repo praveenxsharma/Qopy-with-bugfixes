@@ -1,6 +1,6 @@
 <template>
   <main>
-    <TopBar ref="topBar" @search="searchHistory" @searchStarted="searchStarted" />
+    <TopBar ref="topBar" @search="searchHistory" @searchStarted="searchStarted" @filter="setContentFilter" />
     <div class="container">
       <OverlayScrollbarsComponent class="results" ref="resultsContainer"
         :options="{ scrollbars: { autoHide: 'scroll' } }">
@@ -51,7 +51,9 @@
       text: 'Actions',
       icon: IconsK,
       showModifier: true,
+      onClick: openActionsMenu,
     }" />
+    <ActionsMenu ref="actionsMenu" :selected-item="selectedItem" @changed="onActionsChanged" @close="onActionsClosed" />
   </main>
 </template>
 
@@ -81,6 +83,7 @@ import {
 } from "~/lib/selectedResult";
 import IconsEnter from "~/components/Icons/Enter.vue";
 import IconsK from "~/components/Icons/K.vue";
+import ActionsMenu from "~/components/ActionsMenu.vue";
 import { Key, useKeyboard } from "@waradu/keyboard";
 
 interface GroupedHistory {
@@ -100,6 +103,7 @@ const TOP_SCROLL_PADDING = 37;
 const history = shallowRef<HistoryItem[]>([]);
 let offset = 0;
 let isLoading = false;
+const contentFilter = ref<string>("all");
 
 const resultsContainer = shallowRef<InstanceType<
   typeof OverlayScrollbarsComponent
@@ -117,6 +121,25 @@ const pageTitle = ref<string>("");
 const pageOgImage = ref<string>("");
 
 const topBar = ref<{ searchInput: HTMLInputElement | null } | null>(null);
+
+const actionsMenu = ref<InstanceType<typeof ActionsMenu> | null>(null);
+
+const openActionsMenu = () => {
+  actionsMenu.value?.show(430, 230);
+};
+
+const onActionsChanged = async () => {
+  history.value = [];
+  offset = 0;
+  await loadHistoryChunk();
+  if (groupedHistory.value[0]?.items.length > 0) {
+    handleSelection(0, 0, false);
+  }
+};
+
+const onActionsClosed = () => {
+  searchInput.value?.focus();
+};
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
   return (
@@ -143,6 +166,7 @@ const groupedHistory = computed<GroupedHistory[]>(() => {
   const thisYear = now.getFullYear();
 
   const groups: Record<string, HistoryItem[]> = {
+    Pinned: [],
     Today: [],
     Yesterday: [],
     "This Week": [],
@@ -151,15 +175,23 @@ const groupedHistory = computed<GroupedHistory[]>(() => {
     "Last Year": [],
   };
 
-  const filteredItems = searchQuery.value
+  const filteredItems = (searchQuery.value
     ? history.value.filter((item) =>
       item.content.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
-    : history.value;
+    : history.value
+  ).filter(
+    (item) => contentFilter.value === "all" || item.content_type === contentFilter.value
+  );
 
   const yesterday = new Date(today.getTime() - 86400000);
 
   filteredItems.forEach((item) => {
+    if (item.pinned) {
+      groups.Pinned.push(item);
+      return;
+    }
+
     const itemDate = new Date(item.timestamp);
     const itemWeek = getWeekNumber(itemDate);
     const itemYear = itemDate.getFullYear();
@@ -369,6 +401,10 @@ const searchHistory = async (query: string): Promise<void> => {
   }
 };
 
+const setContentFilter = (filter: string): void => {
+  contentFilter.value = filter;
+};
+
 watch(
   () => groupedHistory.value,
   (newGroupedHistory) => {
@@ -548,14 +584,22 @@ const setupEventListeners = async (): Promise<void> => {
 
     switch (os.value) {
       case "macos":
-        keyboard.listen([Key.Meta, Key.K], () => { }, { prevent: true });
-        keyboard.listen([Key.Meta, Key.K], () => { }, { prevent: true });
+        keyboard.listen([Key.Meta, Key.K], () => {
+          openActionsMenu();
+        }, { prevent: true });
+        keyboard.listen([Key.Meta, Key.K], () => {
+          openActionsMenu();
+        }, { prevent: true });
         break;
 
       case "linux":
       case "windows":
-        keyboard.listen([Key.Control, Key.K], () => { }, { prevent: true });
-        keyboard.listen([Key.Control, Key.K], () => { }, { prevent: true });
+        keyboard.listen([Key.Control, Key.K], () => {
+          openActionsMenu();
+        }, { prevent: true });
+        keyboard.listen([Key.Control, Key.K], () => {
+          openActionsMenu();
+        }, { prevent: true });
         break;
     }
   });
@@ -583,14 +627,22 @@ const setupEventListeners = async (): Promise<void> => {
 
   switch (os.value) {
     case "macos":
-      keyboard.listen([Key.Meta, Key.K], () => { }, { prevent: true });
-      keyboard.listen([Key.Meta, Key.K], () => { }, { prevent: true });
+      keyboard.listen([Key.Meta, Key.K], () => {
+        openActionsMenu();
+      }, { prevent: true });
+      keyboard.listen([Key.Meta, Key.K], () => {
+        openActionsMenu();
+      }, { prevent: true });
       break;
 
     case "linux":
     case "windows":
-      keyboard.listen([Key.Control, Key.K], () => { }, { prevent: true });
-      keyboard.listen([Key.Control, Key.K], () => { }, { prevent: true });
+      keyboard.listen([Key.Control, Key.K], () => {
+        openActionsMenu();
+      }, { prevent: true });
+      keyboard.listen([Key.Control, Key.K], () => {
+        openActionsMenu();
+      }, { prevent: true });
       break;
   }
 };
