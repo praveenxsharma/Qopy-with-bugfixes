@@ -1,4 +1,4 @@
-name: "Nightly Builds"
+name: "Windows Build"
 
 on:
   push:
@@ -20,119 +20,10 @@ jobs:
         id: get_version
         run: echo "VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
 
-  build-macos:
-    needs: prepare
-    runs-on: macos-latest
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        include:
-          - args: "--target aarch64-apple-darwin"
-            arch: "arm64"
-          - args: "--target x86_64-apple-darwin"
-            arch: "x64"
-    env:
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Redact Sensitive Information
-        run: |
-          function redact_output {
-            sed -e "s/${{ secrets.APPLE_ID }}/REDACTED/g;s/${{ secrets.APPLE_ID_PASSWORD }}/REDACTED/g;s/${{ secrets.APPLE_CERTIFICATE }}/REDACTED/g;s/${{ secrets.APPLE_CERTIFICATE_PASSWORD }}/REDACTED/g;s/${{ secrets.KEYCHAIN_PASSWORD }}/REDACTED/g;s/${{ secrets.PAT }}/REDACTED/g;s/${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}/REDACTED/g"
-          }
-          exec > >(redact_output) 2>&1
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "src-tauri -> target"
-          cache-directories: "~/.cargo/registry/index/,~/.cargo/registry/cache/,~/.cargo/git/db/"
-          shared-key: "macos-rust-cache"
-          save-if: "true"
-      - run: bun install
-      - name: Import Apple Developer Certificate
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 7200 build.keychain
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          security find-identity -v -p codesigning build.keychain
-      - name: Verify Certificate
-        run: |
-          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Apple Development")
-          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
-          echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
-          echo "Certificate imported."
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
-        with:
-          args: ${{ matrix.args }}
-      - name: Debug Signing Process
-        if: failure()
-        run: |
-          echo "Attempting manual signing:"
-          timeout 300 codesign --force --options runtime --sign "$CERT_ID" --entitlements src-tauri/entitlements.plist src-tauri/target/${{ matrix.args == '--target aarch64-apple-darwin' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/macos/Qopy.app
-          echo "Verifying signature:"
-          codesign -dv --verbose=4 "src-tauri/target/${{ matrix.args == '--target aarch64-apple-darwin' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/macos/Qopy.app" | sed 's/.*Authority=.*/Authority=REDACTED/'
-      - name: Set architecture label
-        run: |
-          if [[ "${{ matrix.args }}" == "--target aarch64-apple-darwin" ]]; then
-            echo "ARCH_LABEL=aarch64-apple-darwin" >> $GITHUB_ENV
-          else
-            echo "ARCH_LABEL=x86_64-apple-darwin" >> $GITHUB_ENV
-          fi
-      - name: Rename and Publish macOS Artifacts
-        run: |
-          mv src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/dmg/*.dmg src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/dmg/Qopy-${{ needs.prepare.outputs.version }}_${{ matrix.arch }}.dmg
-          mv src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/*.app.tar.gz src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/Qopy-${{ needs.prepare.outputs.version }}_${{ matrix.arch }}.app.tar.gz
-          mv src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/*.app.tar.gz.sig src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/Qopy-${{ needs.prepare.outputs.version }}_${{ matrix.arch }}.app.tar.gz.sig
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg-${{ matrix.arch }}
-          path: "src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/dmg/*.dmg"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: updater-macos-${{ matrix.arch }}
-          path: |
-            src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/${{ env.ARCH_LABEL }}/release/bundle/macos/*.app.tar.gz.sig
-
   build-windows:
     needs: prepare
-    strategy:
-      matrix:
-        include:
-          - args: "--target x86_64-pc-windows-msvc"
-            arch: "x64"
-            target: "x86_64-pc-windows-msvc"
-          - args: "--target aarch64-pc-windows-msvc"
-            arch: "arm64"
-            target: "aarch64-pc-windows-msvc"
     runs-on: windows-latest
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -143,7 +34,7 @@ jobs:
           node-version: 20
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri -> target"
@@ -155,86 +46,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }}
-      - name: List Bundle Directory
+          args: --target x86_64-pc-windows-msvc
+      - name: Rename Windows Artifact
         shell: pwsh
         run: |
-          Write-Output "Checking build directories..."
-          Get-ChildItem -Path "src-tauri/target" -Recurse -Directory | Where-Object { $_.Name -eq "msi" } | ForEach-Object {
-            Write-Output "Found MSI directory: $($_.FullName)"
-            Get-ChildItem -Path $_.FullName -Filter "*.msi" | ForEach-Object {
-              Write-Output "Found MSI file: $($_.FullName)"
+          $bundlePath = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi"
+          if (Test-Path $bundlePath) {
+            Get-ChildItem -Path "$bundlePath/*.msi" | ForEach-Object {
+              $newName = "Qopy-${{ needs.prepare.outputs.version }}_x64.msi"
+              Rename-Item -Path $_.FullName -NewName $newName
             }
+          } else {
+            Write-Error "Path ${bundlePath} does not exist."
+            exit 1
           }
-      - name: Rename and Publish Windows Artifacts
-        run: |
-          mv src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi src-tauri/target/${{ matrix.target }}/release/bundle/msi/Qopy-${{ needs.prepare.outputs.version }}_${{ matrix.arch }}.msi
-          mv src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi.sig src-tauri/target/${{ matrix.target }}/release/bundle/msi/Qopy-${{ needs.prepare.outputs.version }}_${{ matrix.arch }}.msi.sig
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-${{ matrix.arch }}
-          path: src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: updater-windows-${{ matrix.arch }}
-          path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
-            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi.sig
-
-  build-ubuntu:
-    needs: prepare
-    runs-on: ubuntu-latest
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "src-tauri -> target"
-          cache-directories: "~/.cargo/registry/index/,~/.cargo/registry/cache/,~/.cargo/git/db/"
-          shared-key: "ubuntu-rust-cache"
-          save-if: "true"
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev rpm
-          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-      - run: bun install
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --target x86_64-unknown-linux-gnu
-      - name: Rename Linux Artifacts
-        run: |
-          mv src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/Qopy-${{ needs.prepare.outputs.version }}.deb
-          mv src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/Qopy-${{ needs.prepare.outputs.version }}.AppImage
-          mv src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/Qopy-${{ needs.prepare.outputs.version }}.AppImage.sig
-          mv src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/Qopy-${{ needs.prepare.outputs.version }}.rpm
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ubuntu-deb
-          path: src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ubuntu-appimage
-          path: src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ubuntu-rpm
-          path: src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
-      - uses: actions/upload-artifact@v4
-        with:
-          name: updater-ubuntu
-          path: |
-            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-            src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
+          name: windows-x64
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
