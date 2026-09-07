@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "windows"))]
 use applications::{AppInfoContext, AppInfo, AppTrait, utils::image::RustImage};
 use base64::{ engine::general_purpose::STANDARD, Engine };
 use image::codecs::png::PngEncoder;
@@ -38,29 +39,39 @@ pub fn center_window_on_current_monitor(window: &tauri::WebviewWindow) {
 
 pub fn get_app_info() -> (String, Option<String>) {
     // The `applications` crate's `get_frontmost_application` is unimplemented on
-    // Windows and panics with "not yet implemented". Relying on it directly would
-    // crash the clipboard handler on every copy, so we isolate the whole lookup
-    // behind catch_unwind and fall back to a generic source on any panic/error.
-    let result = std::panic::catch_unwind(|| {
-        let mut ctx = AppInfoContext::new(vec![]);
-        ctx.refresh_apps().unwrap();
-        match ctx.get_frontmost_application() {
-            Ok(window) => {
-                let name = window.name.clone();
-                let icon = window
-                    .load_icon()
-                    .ok()
-                    .map(|i| {
-                        let png = i.to_png().unwrap();
-                        STANDARD.encode(png.get_bytes())
-                    });
-                (name, icon)
-            }
-            Err(_) => ("System".to_string(), None),
-        }
-    });
+    // Windows and panics with "not yet implemented", while `refresh_apps()` spams
+    // WARN/DEBUG lines per installed app. Calling it on every clipboard change
+    // would both crash capture and bloat the log. Frontmost-app detection is only
+    // implemented on macos/linux, so gate the crate lookup off on Windows and
+    // short-circuit to a generic source (no panic, no enumeration noise).
+    #[cfg(target_os = "windows")]
+    {
+        ("System".to_string(), None)
+    }
 
-    result.unwrap_or_else(|_| ("System".to_string(), None))
+    #[cfg(not(target_os = "windows"))]
+    {
+        let result = std::panic::catch_unwind(|| {
+            let mut ctx = AppInfoContext::new(vec![]);
+            ctx.refresh_apps().unwrap();
+            match ctx.get_frontmost_application() {
+                Ok(window) => {
+                    let name = window.name.clone();
+                    let icon = window
+                        .load_icon()
+                        .ok()
+                        .map(|i| {
+                            let png = i.to_png().unwrap();
+                            STANDARD.encode(png.get_bytes())
+                        });
+                    (name, icon)
+                }
+                Err(_) => ("System".to_string(), None),
+            }
+        });
+
+        result.unwrap_or_else(|_| ("System".to_string(), None))
+    }
 }
 
 fn _process_icon_to_base64(path: &str) -> Result<String, Box<dyn std::error::Error>> {
