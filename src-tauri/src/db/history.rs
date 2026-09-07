@@ -141,16 +141,26 @@ pub async fn search_history(
 pub async fn load_history_chunk(
     pool: tauri::State<'_, SqlitePool>,
     offset: i64,
-    limit: i64
+    limit: i64,
+    content_type: Option<String>
 ) -> Result<Vec<HistoryItem>, String> {
-    let rows = sqlx
-        ::query(
+    let rows = match content_type {
+        Some(t) => sqlx::query(
+            "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language, pinned, title FROM history WHERE content_type = ? ORDER BY pinned DESC, timestamp DESC LIMIT ? OFFSET ?"
+        )
+        .bind(&t)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&*pool).await
+        .map_err(|e| e.to_string())?,
+        None => sqlx::query(
             "SELECT id, source, source_icon, content_type, content, favicon, timestamp, language, pinned, title FROM history ORDER BY pinned DESC, timestamp DESC LIMIT ? OFFSET ?"
         )
         .bind(limit)
         .bind(offset)
         .fetch_all(&*pool).await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?,
+    };
 
     let items = rows.iter().map(map_row).collect();
 

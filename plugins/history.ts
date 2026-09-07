@@ -24,12 +24,14 @@ export default defineNuxtPlugin(() => {
 
         async loadHistoryChunk(
           offset: number,
-          limit: number
+          limit: number,
+          contentType?: string
         ): Promise<HistoryItem[]> {
           try {
             return await invoke<HistoryItem[]>("load_history_chunk", {
               offset,
               limit,
+              contentType,
             });
           } catch (error) {
             console.error("Error loading history chunk:", error);

@@ -134,10 +134,12 @@ const openActionsMenu = () => {
 
 const onActionsChanged = async () => {
   const loadedPages = Math.max(1, Math.ceil(history.value.length / CHUNK_SIZE));
+  const contentType =
+    contentFilter.value === "all" ? undefined : contentFilter.value;
   history.value = [];
   offset = 0;
   for (let page = 0; page < loadedPages; page++) {
-    const results = await $history.loadHistoryChunk(offset, CHUNK_SIZE);
+    const results = await $history.loadHistoryChunk(offset, CHUNK_SIZE, contentType);
     if (!results.length) break;
     const processedItems = await processHistoryRows(results);
     history.value = [...history.value, ...processedItems];
@@ -283,7 +285,9 @@ const loadHistoryChunk = async (): Promise<void> => {
   isLoading = true;
 
   try {
-    const results = await $history.loadHistoryChunk(offset, CHUNK_SIZE);
+    const contentType =
+      contentFilter.value === "all" ? undefined : contentFilter.value;
+    const results = await $history.loadHistoryChunk(offset, CHUNK_SIZE, contentType);
     if (!results.length) {
       isLoading = false;
       return;
@@ -419,6 +423,9 @@ const searchHistory = async (query: string): Promise<void> => {
 
 const setContentFilter = (filter: string): void => {
   contentFilter.value = filter;
+  history.value = [];
+  offset = 0;
+  loadHistoryChunk();
 };
 
 watch(
@@ -471,7 +478,9 @@ const getYoutubeThumbnail = (url: string): string => {
 };
 
 const updateHistory = async (resetScroll: boolean = false): Promise<void> => {
-  const results = await $history.loadHistoryChunk(0, CHUNK_SIZE);
+  const contentType =
+    contentFilter.value === "all" ? undefined : contentFilter.value;
+  const results = await $history.loadHistoryChunk(0, CHUNK_SIZE, contentType);
   if (results.length > 0) {
     const existingIds = new Set(history.value.map((item) => item.id));
     const uniqueNewItems = results.filter((item) => !existingIds.has(item.id));
