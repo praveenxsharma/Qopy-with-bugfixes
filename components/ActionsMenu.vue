@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="menu">
-      <div v-if="visible" class="actions-menu" :style="menuStyle" @contextmenu.prevent>
+      <div ref="menuEl" v-if="visible" class="actions-menu" :style="menuStyle" @contextmenu.prevent>
         <p class="menu-title">Actions</p>
 
         <button class="menu-item" @click="action(pin, 'toggle')">
@@ -91,13 +91,19 @@
         <button class="menu-item delete" @click="action(clearAll)">
           <span class="item-label">Delete All Entries</span>
         </button>
+
+        <div class="menu-divider"></div>
+
+        <button class="menu-item" @click="hide">
+          <span class="item-label">Close</span>
+        </button>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { HistoryItem } from "~/types/types";
 
@@ -113,12 +119,43 @@ const emit = defineEmits<{
 const visible = ref(false);
 const x = ref(0);
 const y = ref(0);
+const menuEl = ref<HTMLElement | null>(null);
 const renaming = ref(false);
 const renameValue = ref("");
 const menuStyle = computed(() => ({
   left: `${x.value}px`,
   top: `${y.value}px`,
 }));
+
+const hide = () => {
+  visible.value = false;
+  emit("close");
+};
+
+const onDocumentClick = (event: MouseEvent) => {
+  if (!visible.value) return;
+  if (!menuEl.value) return;
+  if (menuEl.value.contains(event.target as Node)) return;
+  hide();
+};
+
+const onDocumentKeydown = (event: KeyboardEvent) => {
+  if (!visible.value) return;
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  event.stopPropagation();
+  hide();
+};
+
+onMounted(() => {
+  document.addEventListener("mousedown", onDocumentClick);
+  document.addEventListener("keydown", onDocumentKeydown, true);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("mousedown", onDocumentClick);
+  document.removeEventListener("keydown", onDocumentKeydown, true);
+});
 
 const getContent = async (item: HistoryItem): Promise<{ content: string; type: string }> => {
   if (item.content_type === "image") {
@@ -232,11 +269,6 @@ const show = (clientX: number, clientY: number) => {
   x.value = clientX;
   y.value = clientY;
   visible.value = true;
-};
-
-const hide = () => {
-  visible.value = false;
-  emit("close");
 };
 
 defineExpose({ show, hide, visible });

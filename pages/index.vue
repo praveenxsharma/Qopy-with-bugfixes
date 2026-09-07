@@ -125,7 +125,11 @@ const topBar = ref<{ searchInput: HTMLInputElement | null } | null>(null);
 const actionsMenu = ref<InstanceType<typeof ActionsMenu> | null>(null);
 
 const openActionsMenu = () => {
-  actionsMenu.value?.show(430, 230);
+  if (actionsMenu.value?.visible) {
+    actionsMenu.value.hide();
+  } else {
+    actionsMenu.value?.show(430, 230);
+  }
 };
 
 const onActionsChanged = async () => {
@@ -579,7 +583,11 @@ const setupEventListeners = async (): Promise<void> => {
     }, { prevent: true });
 
     keyboard.listen([Key.Escape], () => {
-      hideApp();
+      if (actionsMenu.value?.visible) {
+        actionsMenu.value.hide();
+      } else {
+        hideApp();
+      }
     }, { prevent: true });
 
     switch (os.value) {
@@ -587,16 +595,10 @@ const setupEventListeners = async (): Promise<void> => {
         keyboard.listen([Key.Meta, Key.K], () => {
           openActionsMenu();
         }, { prevent: true });
-        keyboard.listen([Key.Meta, Key.K], () => {
-          openActionsMenu();
-        }, { prevent: true });
         break;
 
       case "linux":
       case "windows":
-        keyboard.listen([Key.Control, Key.K], () => {
-          openActionsMenu();
-        }, { prevent: true });
         keyboard.listen([Key.Control, Key.K], () => {
           openActionsMenu();
         }, { prevent: true });
@@ -622,7 +624,11 @@ const setupEventListeners = async (): Promise<void> => {
   }, { prevent: true });
 
   keyboard.listen([Key.Escape], () => {
-    hideApp();
+    if (actionsMenu.value?.visible) {
+      actionsMenu.value.hide();
+    } else {
+      hideApp();
+    }
   }, { prevent: true });
 
   switch (os.value) {
@@ -630,16 +636,10 @@ const setupEventListeners = async (): Promise<void> => {
       keyboard.listen([Key.Meta, Key.K], () => {
         openActionsMenu();
       }, { prevent: true });
-      keyboard.listen([Key.Meta, Key.K], () => {
-        openActionsMenu();
-      }, { prevent: true });
       break;
 
     case "linux":
     case "windows":
-      keyboard.listen([Key.Control, Key.K], () => {
-        openActionsMenu();
-      }, { prevent: true });
       keyboard.listen([Key.Control, Key.K], () => {
         openActionsMenu();
       }, { prevent: true });
