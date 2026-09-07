@@ -38,14 +38,27 @@ pub async fn write_and_paste(
         "image" => {
             clipboard.write_image_base64(content).map_err(|e| e.to_string())?;
         }
-        "files" => {
+        "file" | "files" => {
+            let items: Vec<String> = content
+                .split(", ")
+                .map(|file| file.trim().to_string())
+                .filter(|f| !f.is_empty())
+                .collect();
+
+            #[cfg(not(target_os = "windows"))]
+            let items: Vec<String> = items
+                .iter()
+                .map(|f| {
+                    if f.starts_with("file://") {
+                        f.clone()
+                    } else {
+                        format!("file://{}", f)
+                    }
+                })
+                .collect();
+
             clipboard
-                .write_files_uris(
-                    content
-                        .split(", ")
-                        .map(|file| file.to_string())
-                        .collect::<Vec<String>>()
-                )
+                .write_files_uris(items)
                 .map_err(|e| e.to_string())?;
         }
         _ => {
@@ -106,14 +119,27 @@ pub async fn copy_to_clipboard(
         "image" => {
             clipboard.write_image_base64(content).map_err(|e| e.to_string())?;
         }
-        "files" => {
+        "file" | "files" => {
+            let items: Vec<String> = content
+                .split(", ")
+                .map(|file| file.trim().to_string())
+                .filter(|f| !f.is_empty())
+                .collect();
+
+            #[cfg(not(target_os = "windows"))]
+            let items: Vec<String> = items
+                .iter()
+                .map(|f| {
+                    if f.starts_with("file://") {
+                        f.clone()
+                    } else {
+                        format!("file://{}", f)
+                    }
+                })
+                .collect();
+
             clipboard
-                .write_files_uris(
-                    content
-                        .split(", ")
-                        .map(|file| file.to_string())
-                        .collect::<Vec<String>>()
-                )
+                .write_files_uris(items)
                 .map_err(|e| e.to_string())?;
         }
         _ => {

@@ -133,9 +133,16 @@ const openActionsMenu = () => {
 };
 
 const onActionsChanged = async () => {
+  const loadedPages = Math.max(1, Math.ceil(history.value.length / CHUNK_SIZE));
   history.value = [];
   offset = 0;
-  await loadHistoryChunk();
+  for (let page = 0; page < loadedPages; page++) {
+    const results = await $history.loadHistoryChunk(offset, CHUNK_SIZE);
+    if (!results.length) break;
+    const processedItems = await processHistoryRows(results);
+    history.value = [...history.value, ...processedItems];
+    offset += CHUNK_SIZE;
+  }
   if (groupedHistory.value[0]?.items.length > 0) {
     handleSelection(0, 0, false);
   }
@@ -218,6 +225,59 @@ const groupedHistory = computed<GroupedHistory[]>(() => {
 const { selectedItem, isSelected, selectNext, selectPrevious, selectItem } =
   useSelectedResult(groupedHistory);
 
+const processHistoryRows = async (results: HistoryItem[]): Promise<HistoryItem[]> => {
+  return Promise.all(
+    results.map(async (item) => {
+      const historyItem = new HistoryItem(
+        item.source,
+        item.content_type,
+        item.content,
+        item.favicon,
+        item.source_icon,
+        item.language
+      );
+      Object.assign(historyItem, {
+        id: item.id,
+        timestamp: new Date(item.timestamp),
+        pinned: item.pinned,
+        title: item.title,
+      });
+
+      if (historyItem.content_type === ContentType.Image) {
+        try {
+          const base64 = await $history.readImage({
+            filename: historyItem.content,
+          });
+          const size = Math.ceil((base64.length * 3) / 4);
+          imageSizes.value[historyItem.id] = formatFileSize(size);
+
+          const img = new Image();
+          img.src = `data:image/png;base64,${base64}`;
+          imageUrls.value[historyItem.id] = img.src;
+
+          await new Promise<void>((resolve) => {
+            img.onload = () => {
+              imageDimensions.value[
+                historyItem.id
+              ] = `${img.width}x${img.height}`;
+              resolve();
+            };
+            img.onerror = () => {
+              imageDimensions.value[historyItem.id] = "Error";
+              resolve();
+            };
+          });
+        } catch (error) {
+          console.error("Error processing image:", error);
+          imageDimensions.value[historyItem.id] = "Error";
+          imageSizes.value[historyItem.id] = "Error";
+        }
+      }
+      return historyItem;
+    })
+  );
+};
+
 const loadHistoryChunk = async (): Promise<void> => {
   if (isLoading) return;
   isLoading = true;
@@ -229,55 +289,7 @@ const loadHistoryChunk = async (): Promise<void> => {
       return;
     }
 
-    const processedItems = await Promise.all(
-      results.map(async (item) => {
-        const historyItem = new HistoryItem(
-          item.source,
-          item.content_type,
-          item.content,
-          item.favicon,
-          item.source_icon,
-          item.language
-        );
-        Object.assign(historyItem, {
-          id: item.id,
-          timestamp: new Date(item.timestamp),
-        });
-
-        if (historyItem.content_type === ContentType.Image) {
-          try {
-            const base64 = await $history.readImage({
-              filename: historyItem.content,
-            });
-            const size = Math.ceil((base64.length * 3) / 4);
-            imageSizes.value[historyItem.id] = formatFileSize(size);
-
-            const img = new Image();
-            img.src = `data:image/png;base64,${base64}`;
-            imageUrls.value[historyItem.id] = img.src;
-
-            await new Promise<void>((resolve) => {
-              img.onload = () => {
-                imageDimensions.value[
-                  historyItem.id
-                ] = `${img.width}x${img.height}`;
-                resolve();
-              };
-              img.onerror = () => {
-                imageDimensions.value[historyItem.id] = "Error";
-                resolve();
-              };
-            });
-          } catch (error) {
-            console.error("Error processing image:", error);
-            imageDimensions.value[historyItem.id] = "Error";
-            imageSizes.value[historyItem.id] = "Error";
-          }
-        }
-        return historyItem;
-      })
-    );
-
+    const processedItems = await processHistoryRows(results);
     history.value = [...history.value, ...processedItems];
     offset += CHUNK_SIZE;
   } catch (error) {
@@ -376,7 +388,7 @@ const processSearchQueue = async () => {
           item.source_icon,
           item.language
         ),
-        { id: item.id, timestamp: new Date(item.timestamp) }
+        { id: item.id, timestamp: new Date(item.timestamp), pinned: item.pinned, title: item.title }
       )
     );
   
@@ -464,54 +476,7 @@ const updateHistory = async (resetScroll: boolean = false): Promise<void> => {
     const existingIds = new Set(history.value.map((item) => item.id));
     const uniqueNewItems = results.filter((item) => !existingIds.has(item.id));
 
-    const processedNewItems = await Promise.all(
-      uniqueNewItems.map(async (item) => {
-        const historyItem = new HistoryItem(
-          item.source,
-          item.content_type,
-          item.content,
-          item.favicon,
-          item.source_icon,
-          item.language
-        );
-        Object.assign(historyItem, {
-          id: item.id,
-          timestamp: new Date(item.timestamp),
-        });
-
-        if (historyItem.content_type === ContentType.Image) {
-          try {
-            const base64 = await $history.readImage({
-              filename: historyItem.content,
-            });
-            const size = Math.ceil((base64.length * 3) / 4);
-            imageSizes.value[historyItem.id] = formatFileSize(size);
-
-            const img = new Image();
-            img.src = `data:image/png;base64,${base64}`;
-            imageUrls.value[historyItem.id] = img.src;
-
-            await new Promise<void>((resolve) => {
-              img.onload = () => {
-                imageDimensions.value[
-                  historyItem.id
-                ] = `${img.width}x${img.height}`;
-                resolve();
-              };
-              img.onerror = () => {
-                imageDimensions.value[historyItem.id] = "Error";
-                resolve();
-              };
-            });
-          } catch (error) {
-            console.error("Error processing image:", error);
-            imageDimensions.value[historyItem.id] = "Error";
-            imageSizes.value[historyItem.id] = "Error";
-          }
-        }
-        return historyItem;
-      })
-    );
+    const processedNewItems = await processHistoryRows(uniqueNewItems);
 
     history.value = [...processedNewItems, ...history.value];
 
