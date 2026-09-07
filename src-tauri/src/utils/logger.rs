@@ -79,6 +79,8 @@ pub fn init_logger(app_data_dir: &std::path::Path) -> Result<(), SetLoggerError>
     unsafe {
         log::set_logger_racy(Box::leak(logger))?;
     }
-    log::set_max_level(LevelFilter::Debug);
+    // Debug floods the log with the `applications` crate's per-app enumeration
+    // spam on every clipboard change (grows the log by hundreds of MB).
+    log::set_max_level(LevelFilter::Info);
     Ok(())
 }
