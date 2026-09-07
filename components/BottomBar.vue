@@ -10,7 +10,7 @@
         <component :is="primaryAction.icon" />
       </div>
       <div v-if="secondaryAction" class="divider"></div>
-      <div v-if="secondaryAction" class="actions" @click="secondaryAction.onClick">
+      <div v-if="secondaryAction" class="actions" data-actions-trigger @click="secondaryAction.onClick">
         <p class="text">{{ secondaryAction.text }}</p>
         <div>
           <IconsCtrl v-if="(os === 'windows' || os === 'linux') && secondaryAction.showModifier" />

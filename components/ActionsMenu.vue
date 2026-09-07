@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { HistoryItem } from "~/types/types";
 
@@ -134,8 +134,10 @@ const hide = () => {
 
 const onDocumentClick = (event: MouseEvent) => {
   if (!visible.value) return;
+  const target = event.target as Element | null;
+  if (target?.closest("[data-actions-trigger]")) return;
   if (!menuEl.value) return;
-  if (menuEl.value.contains(event.target as Node)) return;
+  if (menuEl.value.contains(target)) return;
   hide();
 };
 
@@ -269,6 +271,27 @@ const show = (clientX: number, clientY: number) => {
   x.value = clientX;
   y.value = clientY;
   visible.value = true;
+
+  nextTick(() => {
+    const el = menuEl.value;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const MARGIN = 8;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+
+    let top = Math.min(clientY, viewportH - rect.height - MARGIN);
+    if (top < MARGIN) top = MARGIN;
+
+    const halfW = rect.width / 2;
+    const left = Math.min(
+      Math.max(clientX, MARGIN + halfW),
+      viewportW - halfW - MARGIN
+    );
+
+    x.value = left;
+    y.value = top;
+  });
 };
 
 defineExpose({ show, hide, visible });
@@ -279,6 +302,8 @@ defineExpose({ show, hide, visible });
   position: fixed;
   z-index: 1000;
   width: 180px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   background: #3a3836;
   border: 1px solid var(--border);
   border-radius: 10px;
