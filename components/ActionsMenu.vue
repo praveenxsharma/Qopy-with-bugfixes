@@ -275,15 +275,18 @@ const show = (clientX: number, clientY: number) => {
   nextTick(() => {
     const el = menuEl.value;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
+
     const MARGIN = 8;
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
 
-    let top = Math.min(clientY, viewportH - rect.height - MARGIN);
+    const menuW = el.offsetWidth;
+    const menuH = el.offsetHeight;
+
+    let top = Math.min(clientY, viewportH - menuH - MARGIN);
     if (top < MARGIN) top = MARGIN;
 
-    const halfW = rect.width / 2;
+    const halfW = menuW / 2;
     const left = Math.min(
       Math.max(clientX, MARGIN + halfW),
       viewportW - halfW - MARGIN
